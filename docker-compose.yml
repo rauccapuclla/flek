@@ -1,0 +1,69 @@
+version: '2'
+services:
+  elasticsearch:
+    build: ./elasticsearch
+    image: dockerhub/rauccapuclla/elaticsearch
+    environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - LOGSPOUT=ignore
+    volumes:
+      - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    networks:
+      - flek
+  kibana:
+    build: ./kibana
+    image: dockerhub/rauccapuclla/kibana
+    environment:
+      - LOGSPOUT=ignore
+    ports:
+      - 5601:5601
+    volumes:
+      - ./kibana/config/:/usr/share/kibana/config
+    networks:
+      - flek
+  logstash:
+    build: ./logstash
+    image: dockerhub/rauccapuclla/logstash
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+      - ./logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    ports:
+      - "5000:5000"
+      - "5000:5000/udp"
+      - "5055:5055"
+    environment:
+      - LOGSPOUT=ignore
+    depends_on:
+      - elasticsearch
+    networks:
+      - flek
+  logspout:
+    image: gliderlabs/logspout
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      DEBUG: "true"
+    command: syslog://logstash:5000
+    depends_on:
+      - logstash
+      - elasticsearch
+      - kibana
+    networks:
+      - flek
+  filebeat:
+    build: ./filebeat
+    image: dockerhub/rauccapuclla/filebeat
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      - /var/lib/docker/containers:/hostfs/var/lib/docker/containers:rw
+    networks:
+      - flek
+volumes:
+  esdata:
+    driver: local
+
+networks:
+  flek:
